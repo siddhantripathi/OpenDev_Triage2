@@ -42,15 +42,18 @@ export class FirebaseService {
   }
 
   static async createOrUpdateUser(user: FirebaseUser): Promise<void> {
-    const userDoc: User = {
-      uid: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      attemptsUsed: 0,
-      createdAt: new Date(),
-    };
+    const userRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userRef);
 
-    await setDoc(doc(db, 'users', user.uid), userDoc, { merge: true });
+    if (!userDoc.exists()) {
+      await setDoc(userRef, {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        attemptsLeft: 5,
+        createdAt: new Date(),
+      });
+    }
   }
 
   static async getUser(uid: string): Promise<User | null> {
@@ -67,9 +70,9 @@ export class FirebaseService {
     });
   }
 
-  static async incrementUserAttempts(uid: string): Promise<void> {
+  static async decrementUserAttempts(uid: string): Promise<void> {
     await updateDoc(doc(db, 'users', uid), {
-      attemptsUsed: increment(1),
+      attemptsLeft: increment(-1),
     });
   }
 
@@ -113,6 +116,6 @@ export class FirebaseService {
 
   static async canUserAnalyze(uid: string): Promise<boolean> {
     const user = await this.getUser(uid);
-    return user ? user.attemptsUsed < 5 : false;
+    return user ? user.attemptsLeft > 0 : false;
   }
 }

@@ -34,7 +34,7 @@ export interface User {
   email: string | null;
   displayName: string | null;
   githubToken?: string;
-  attemptsUsed: number;
+  attemptsLeft: number;
   createdAt: Date;
 }
 

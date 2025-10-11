@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { TouchableOpacity, Text } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -10,6 +10,9 @@ import HistoryScreen from '../screens/HistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import AnalysisDetailScreen from '../screens/AnalysisDetailScreen';
 import { UserAnalysis } from '../types';
+
+// Context
+import { useTheme } from '../contexts/ThemeContext';
 
 export type HomeStackParamList = {
   HomeMain: undefined;
@@ -31,6 +34,27 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createStackNavigator<HomeStackParamList>();
 const HistoryStack = createStackNavigator<HistoryStackParamList>();
 
+function ThemeToggle() {
+  const { theme, setTheme, isDark } = useTheme();
+  
+  return (
+    <TouchableOpacity
+      style={styles.themeToggle}
+      onPress={() => {
+        if (theme === 'light') setTheme('dark');
+        else if (theme === 'dark') setTheme('auto');
+        else setTheme('light');
+      }}
+    >
+      <Ionicons
+        name={isDark ? 'moon' : 'sunny'}
+        size={24}
+        color={isDark ? '#FFA000' : '#007AFF'}
+      />
+    </TouchableOpacity>
+  );
+}
+
 function HomeStackScreen() {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
@@ -50,6 +74,8 @@ function HistoryStackScreen() {
 }
 
 export default function MainTabs() {
+  const { colors, isDark } = useTheme();
+  
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -66,11 +92,11 @@ export default function MainTabs() {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: isDark ? '#666' : 'gray',
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopColor: '#e0e0e0',
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
           paddingBottom: 5,
           paddingTop: 5,
           height: 60,
@@ -79,7 +105,12 @@ export default function MainTabs() {
           fontSize: 12,
           fontWeight: '600',
         },
-        headerShown: false,
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: colors.surface,
+        },
+        headerTintColor: colors.text,
+        headerRight: () => <ThemeToggle />,
       })}
     >
       <Tab.Screen
@@ -106,3 +137,10 @@ export default function MainTabs() {
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  themeToggle: {
+    marginRight: 15,
+    padding: 5,
+  },
+});

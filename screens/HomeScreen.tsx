@@ -11,7 +11,9 @@ import {
   RefreshControl,
   Image,
   Platform,
+  ScrollView,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { User as FirebaseUser } from 'firebase/auth';
@@ -39,6 +41,10 @@ export default function HomeScreen() {
   const [importUrl, setImportUrl] = useState('');
   const [showImportInput, setShowImportInput] = useState(false);
   const [latestAnalysis, setLatestAnalysis] = useState<UserAnalysis | null>(null);
+  const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
+  const [branches, setBranches] = useState<Array<{ name: string }>>([]);
+  const [selectedBranch, setSelectedBranch] = useState<string>('main');
+  const [loadingBranches, setLoadingBranches] = useState(false);
 
   const navigation = useNavigation<HomeScreenNavigationProp>();
 
@@ -61,6 +67,12 @@ export default function HomeScreen() {
   useEffect(() => {
     filterRepos();
   }, [searchQuery, repos]);
+
+  useEffect(() => {
+    if (selectedRepo && userData?.githubToken) {
+      loadBranches();
+    }
+  }, [selectedRepo]);
 
   const loadUserData = () => {
     try {
@@ -88,6 +100,30 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.error('[HomeScreen] Error loading latest analysis:', error);
+    }
+  };
+
+  const loadBranches = async () => {
+    if (!selectedRepo || !userData?.githubToken) return;
+    
+    try {
+      setLoadingBranches(true);
+      const repoBranches = await GitHubService.getRepoBranches(
+        userData.githubToken,
+        selectedRepo.owner.login,
+        selectedRepo.name
+      );
+      setBranches(repoBranches);
+      
+      // Set default branch
+      const defaultBranch = GitHubService.getDefaultBranch(repoBranches);
+      setSelectedBranch(defaultBranch);
+    } catch (error) {
+      console.error('Error loading branches:', error);
+      setBranches([]);
+      setSelectedBranch('main');
+    } finally {
+      setLoadingBranches(false);
     }
   };
 
@@ -170,7 +206,7 @@ export default function HomeScreen() {
 
       const repoData: RepoData = {
         repo_owner: repo.owner.login,
-        branch: 'main',
+        branch: selectedBranch, // Use selected branch
         repo_name: repo.name,
       };
 
@@ -190,7 +226,7 @@ export default function HomeScreen() {
       const analysisId = await FirebaseService.saveAnalysis(user.uid, repoData, parsedAnalysis);
       console.log('[HomeScreen] Saved with ID:', analysisId);
       
-      await FirebaseService.incrementUserAttempts(user.uid);
+      await FirebaseService.decrementUserAttempts(user.uid);
       console.log('[HomeScreen] Incremented attempts');
 
       // Create the analysis object to display
@@ -249,62 +285,6 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const renderRepoItem = ({ item }: { item: GitHubRepo }) => (
-    <TouchableOpacity
-      style={styles.repoItem}
-      onPress={() => handleAnalyzeRepo(item)}
-      disabled={loading}
-    >
-      <View style={styles.repoHeader}>
-        <View style={styles.repoInfo}>
-          <Text style={styles.repoName}>{item.name}</Text>
-          <Text style={styles.repoFullName}>{item.full_name}</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.analyzeButton}
-          onPress={() => handleAnalyzeRepo(item)}
-          disabled={loading}
-        >
-          <Text style={styles.analyzeButtonText}>Analyze</Text>
-        </TouchableOpacity>
-      </View>
-
-      {item.description && (
-        <Text style={styles.repoDescription}>{item.description}</Text>
-      )}
-
-      <View style={styles.repoMeta}>
-        {item.language && (
-          <View style={styles.languageContainer}>
-            <View style={[styles.languageDot, { backgroundColor: getLanguageColor(item.language) }]} />
-            <Text style={styles.repoLanguage}>{item.language}</Text>
-          </View>
-        )}
-        <Text style={styles.repoStars}>⭐ {item.stargazers_count}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const getLanguageColor = (language: string): string => {
-    const colors: { [key: string]: string } = {
-      JavaScript: '#f1e05a',
-      TypeScript: '#2b7489',
-      Python: '#3572A5',
-      Java: '#b07219',
-      'C++': '#f34b7d',
-      C: '#555555',
-      'C#': '#239120',
-      PHP: '#4F5D95',
-      Ruby: '#701516',
-      Go: '#00ADD8',
-      Rust: '#dea584',
-      Swift: '#ffac45',
-      Kotlin: '#F18E33',
-      Scala: '#c22d40',
-    };
-    return colors[language] || '#586069';
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -315,7 +295,7 @@ export default function HomeScreen() {
 
         {userData && (
           <Text style={styles.attemptsText}>
-            Attempts remaining: {Math.max(0, 5 - userData.attemptsUsed)}
+            Analyses remaining: {userData.attemptsLeft}
           </Text>
         )}
       </View>
@@ -395,26 +375,85 @@ export default function HomeScreen() {
         </View>
       ) : null}
       
-      {!loading && (
-        <FlatList
-          data={filteredRepos}
-          renderItem={renderRepoItem}
-          keyExtractor={(item) => item.id.toString()}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                {repos.length === 0
-                  ? 'No repositories found. Connect your GitHub account or import from URL.'
-                  : 'No repositories match your search.'}
-              </Text>
-            </View>
-          }
-          contentContainerStyle={repos.length === 0 ? styles.listContainer : undefined}
-        />
-      )}
+      <ScrollView style={styles.pickerScrollView} refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }>
+        {!loading && (
+          <>
+            {repos.length > 0 ? (
+              <>
+                <View style={styles.repoPickerContainer}>
+                  <Text style={styles.pickerLabel}>Select Repository</Text>
+                  <View style={styles.pickerWrapper}>
+                    <Picker
+                      selectedValue={selectedRepo?.id.toString() || ''}
+                      onValueChange={(itemValue) => {
+                        const repo = filteredRepos.find(r => r.id.toString() === itemValue);
+                        setSelectedRepo(repo || null);
+                      }}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="Choose a repository..." value="" />
+                      {filteredRepos.map((repo) => (
+                        <Picker.Item
+                          key={repo.id}
+                          label={`${repo.name} (${repo.owner.login})`}
+                          value={repo.id.toString()}
+                        />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+
+                {selectedRepo && (
+                  <View style={styles.branchPickerContainer}>
+                    <Text style={styles.pickerLabel}>Select Branch</Text>
+                    <View style={styles.pickerWrapper}>
+                      {loadingBranches ? (
+                        <ActivityIndicator size="small" color="#007AFF" />
+                      ) : branches.length > 0 ? (
+                        <Picker
+                          selectedValue={selectedBranch}
+                          onValueChange={setSelectedBranch}
+                          style={styles.picker}
+                        >
+                          {branches.map((branch) => (
+                            <Picker.Item
+                              key={branch.name}
+                              label={branch.name}
+                              value={branch.name}
+                            />
+                          ))}
+                        </Picker>
+                      ) : (
+                        <Text style={styles.noBranchesText}>No branches found</Text>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {selectedRepo && selectedBranch && (
+                  <TouchableOpacity
+                    style={styles.analyzeButtonLarge}
+                    onPress={() => handleAnalyzeRepo(selectedRepo)}
+                    disabled={loading}
+                  >
+                    <Text style={styles.analyzeButtonText}>
+                      Analyze {selectedRepo.name} ({selectedBranch})
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  No repositories found. Connect your GitHub account or import from URL.
+                </Text>
+              </View>
+            )}
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -612,80 +651,50 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  repoItem: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginVertical: 5,
-    borderRadius: 10,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    // Web-compatible shadow
-    ...(Platform.OS === 'web' && {
-      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    }),
+  pickerScrollView: {
+    flex: 1,
   },
-  repoHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  repoPickerContainer: {
+    padding: 20,
+    paddingTop: 10,
+  },
+  branchPickerContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  pickerLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 10,
   },
-  repoInfo: {
-    flex: 1,
-    marginRight: 15,
+  pickerWrapper: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    overflow: 'hidden',
   },
-  repoName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 2,
+  picker: {
+    height: 50,
   },
-  repoFullName: {
-    fontSize: 14,
-    color: '#666',
+  noBranchesText: {
+    padding: 15,
+    color: '#999',
+    textAlign: 'center',
   },
-  analyzeButton: {
+  analyzeButtonLarge: {
     backgroundColor: '#007AFF',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 6,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginHorizontal: 20,
+    marginTop: 10,
+    alignItems: 'center',
   },
   analyzeButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-  },
-  repoDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 10,
-  },
-  repoMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  languageContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  languageDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 5,
-  },
-  repoLanguage: {
-    fontSize: 12,
-    color: '#666',
-  },
-  repoStars: {
-    fontSize: 12,
-    color: '#666',
   },
 });

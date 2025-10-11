@@ -94,4 +94,36 @@ export class GitHubService {
       throw new Error('Failed to search repositories');
     }
   }
+
+  static async getRepoBranches(
+    accessToken: string,
+    owner: string,
+    repo: string
+  ): Promise<Array<{ name: string; protected: boolean }>> {
+    try {
+      const response = await axios.get(
+        `${GITHUB_API_BASE}/repos/${owner}/${repo}/branches`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: 'application/vnd.github.v3+json',
+          },
+          params: {
+            per_page: 100,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+      throw new Error('Failed to fetch branches');
+    }
+  }
+
+  static getDefaultBranch(branches: Array<{ name: string }>): string {
+    // Priority: main > master > first available
+    if (branches.find(b => b.name === 'main')) return 'main';
+    if (branches.find(b => b.name === 'master')) return 'master';
+    return branches[0]?.name || 'main';
+  }
 }

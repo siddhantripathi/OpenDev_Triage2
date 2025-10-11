@@ -51,38 +51,48 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await FirebaseService.signOut();
-              setUser(null);
-              setUserData(null);
-            } catch (error) {
-              console.error('Error signing out:', error);
-              Alert.alert('Error', 'Failed to sign out');
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+    try {
+      if (Platform.OS === 'web') {
+        const confirm = window.confirm('Are you sure you want to sign out?');
+        if (!confirm) return;
+        await performSignOut();
+      } else {
+        Alert.alert(
+          'Sign Out',
+          'Are you sure you want to sign out?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Sign Out', onPress: () => performSignOut(), style: 'destructive' }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error signing out:', error);
+      Alert.alert('Error', 'Failed to sign out');
+    }
+  };
+
+  const performSignOut = async () => {
+    try {
+      setLoading(true);
+      await FirebaseService.signOut();
+      setUser(null);
+      setUserData(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+      if (Platform.OS === 'web') {
+        alert('Failed to sign out');
+      } else {
+        Alert.alert('Error', 'Failed to sign out');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getAttemptsRemaining = () => {
     if (!userData) return 0;
-    return Math.max(0, 5 - userData.attemptsUsed);
+    return Math.max(0, userData.attemptsLeft || 0);
   };
 
   if (!user) {
@@ -118,7 +128,7 @@ export default function ProfileScreen() {
         <View style={styles.statDivider} />
 
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{userData?.attemptsUsed || 0}</Text>
+          <Text style={styles.statNumber}>{5 - (userData?.attemptsLeft || 0)}</Text>
           <Text style={styles.statLabel}>Used</Text>
         </View>
       </View>
@@ -126,7 +136,7 @@ export default function ProfileScreen() {
       <View style={styles.usageContainer}>
         <View style={styles.usageHeader}>
           <Text style={styles.usageTitle}>Usage</Text>
-          <Text style={styles.usageText}>{userData?.attemptsUsed || 0}/5</Text>
+          <Text style={styles.usageText}>{5 - (userData?.attemptsLeft || 0)}/5</Text>
         </View>
         <View style={styles.usageBar}>
           <View
