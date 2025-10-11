@@ -1,0 +1,15 @@
+node_modules
+.expo
+.expo-shared
+*.log
+.DS_Store
+android
+ios
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+opendev-triage-firebase-adminsdk-*.json
+client_secret_*.json
+.env
+
