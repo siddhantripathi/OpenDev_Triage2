@@ -10,6 +10,8 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -18,15 +20,25 @@ import { FirebaseService } from '../services/firebaseService';
 
 // Types
 import { UserAnalysis } from '../types';
+import { HistoryStackParamList } from '../navigation/MainTabs';
+
+type HistoryScreenNavigationProp = StackNavigationProp<HistoryStackParamList, 'HistoryMain'>;
 
 export default function HistoryScreen() {
+  const navigation = useNavigation<HistoryScreenNavigationProp>();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [analyses, setAnalyses] = useState<UserAnalysis[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadUserData();
+    const unsubscribe = loadUserData();
+    return () => {
+      // Cleanup auth listener on unmount
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -35,13 +47,14 @@ export default function HistoryScreen() {
     }
   }, [user]);
 
-  const loadUserData = async () => {
+  const loadUserData = () => {
     try {
-      const currentUser = FirebaseService.onAuthStateChange((firebaseUser) => {
+      const unsubscribe = FirebaseService.onAuthStateChange((firebaseUser) => {
         if (firebaseUser) {
           setUser(firebaseUser);
         }
       });
+      return unsubscribe;
     } catch (error) {
       console.error('Error loading user data:', error);
     }
@@ -53,10 +66,25 @@ export default function HistoryScreen() {
     try {
       setLoading(true);
       const userAnalyses = await FirebaseService.getUserAnalyses(user.uid, 50);
+      console.log('[HistoryScreen] Loaded', userAnalyses.length, 'analyses');
       setAnalyses(userAnalyses);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading analyses:', error);
-      Alert.alert('Error', 'Failed to load analysis history');
+      
+      // Check if it's the index error
+      if (error?.message?.includes('index') || error?.code === 'failed-precondition') {
+        if (Platform.OS === 'web') {
+          alert('Firebase index is being created. Please wait a few minutes and refresh the page.');
+        } else {
+          Alert.alert(
+            'Database Index Required',
+            'Your Firebase database needs an index. Please create it in the Firebase Console and try again in a few minutes.',
+            [{ text: 'OK' }]
+          );
+        }
+      } else {
+        Alert.alert('Error', 'Failed to load analysis history');
+      }
     } finally {
       setLoading(false);
     }
@@ -115,7 +143,10 @@ export default function HistoryScreen() {
         )}
       </View>
 
-      <TouchableOpacity style={styles.viewDetailsButton}>
+      <TouchableOpacity 
+        style={styles.viewDetailsButton}
+        onPress={() => navigation.navigate('AnalysisDetail', { analysis: item })}
+      >
         <Text style={styles.viewDetailsText}>View Full Analysis</Text>
       </TouchableOpacity>
     </TouchableOpacity>

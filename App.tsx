@@ -3,8 +3,8 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
-import { User as FirebaseUser, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
-import { auth } from './firebase';
+import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+import { auth, type Auth } from './firebase';
 
 // Services
 import { FirebaseService } from './services/firebaseService';
@@ -37,20 +37,9 @@ export default function App() {
       setLoading(false);
     });
 
-    // Handle redirect results (for web redirect flow)
-    getRedirectResult(auth).then((result) => {
-      console.log('Redirect result:', result);
-      if (result?.user) {
-        console.log('User from redirect:', result.user);
-        setUser(result.user);
-      }
-    }).catch((error) => {
-      console.error('Redirect result error:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-    });
-
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   if (loading) {

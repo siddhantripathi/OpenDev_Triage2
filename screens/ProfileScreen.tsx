@@ -26,18 +26,25 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadUserData();
+    const unsubscribe = loadUserData();
+    return () => {
+      // Cleanup auth listener on unmount
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
-  const loadUserData = async () => {
+  const loadUserData = () => {
     try {
-      const currentUser = FirebaseService.onAuthStateChange(async (firebaseUser) => {
+      const unsubscribe = FirebaseService.onAuthStateChange(async (firebaseUser) => {
         if (firebaseUser) {
           setUser(firebaseUser);
           const userDoc = await FirebaseService.getUser(firebaseUser.uid);
           setUserData(userDoc);
         }
       });
+      return unsubscribe;
     } catch (error) {
       console.error('Error loading user data:', error);
     }
@@ -213,6 +220,18 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 16,
     color: '#666',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 10,
   },
   statsContainer: {
     flexDirection: 'row',

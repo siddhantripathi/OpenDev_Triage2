@@ -14,6 +14,7 @@ export interface AnalysisResult {
     parts: Array<{
       text: string;
     }>;
+    role?: string;
   };
   finishReason: string;
   index: number;

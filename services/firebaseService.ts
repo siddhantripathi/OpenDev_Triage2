@@ -94,15 +94,21 @@ export class FirebaseService {
     const q = query(
       collection(db, 'analyses'),
       where('userId', '==', uid),
+      // Temporarily disabled until Firebase index is created
+      // Re-enable this after creating the composite index: userId (Ascending) + createdAt (Descending)
       orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
 
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const analyses = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
     })) as UserAnalysis[];
+    
+    // Sort in memory as a temporary workaround
+    return analyses.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   static async canUserAnalyze(uid: string): Promise<boolean> {

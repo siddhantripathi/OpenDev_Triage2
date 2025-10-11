@@ -8,37 +8,121 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { GoogleAuthProvider, signInWithCredential, signInWithPopup } from 'firebase/auth';
 import { auth } from '../firebase';
 import { FirebaseService } from '../services/firebaseService';
 import { User as FirebaseUser } from 'firebase/auth';
+
+// Enable web browser completion in Expo (only for native platforms)
+if (Platform.OS !== 'web') {
+  WebBrowser.maybeCompleteAuthSession();
+}
 
 export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
 
+  // Configure Google Sign-In with expo-auth-session (only for native platforms)
+  const [request, response, promptAsync] = Platform.OS !== 'web' 
+    ? Google.useAuthRequest({
+        iosClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
+        androidClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID,
+      })
+    : [null, null, null] as any;
+
+  useEffect(() => {
+    // Listen for auth state changes
+    const unsubscribe = FirebaseService.onAuthStateChange((firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        // User is signed in, reset loading
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    // Only watch for response on native platforms
+    if (Platform.OS === 'web') return;
+    
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      if (authentication?.idToken) {
+        handleGoogleSignIn(authentication.idToken);
+      }
+    } else if (response?.type === 'error' || response?.type === 'dismiss' || response?.type === 'cancel') {
+      // Reset loading if auth was cancelled or errored
+      setLoading(false);
+    }
+  }, [response]);
+
+  const handleGoogleSignIn = async (idToken: string) => {
+    try {
+      setLoading(true);
+      console.log('Signing in with Google ID token...');
+
+      // Sign in with Firebase using the ID token
+      await FirebaseService.signInWithGoogle(idToken);
+      
+      console.log('Google sign-in successful');
+      // Don't set loading to false here - the auth state listener will handle it
+    } catch (error: any) {
+      console.error('Google sign-in error:', error);
+      
+      let errorMessage = 'Failed to sign in with Google';
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'Sign-in was cancelled';
+      } else if (error.code === 'auth/argument-error') {
+        errorMessage = 'Authentication configuration error. Please check your Firebase setup.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      Alert.alert('Error', errorMessage);
+      setLoading(false);
+    }
+  };
+
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
       console.log('Starting Google sign-in...');
-
-      // Use Firebase's Google Auth Provider
-      const provider = new GoogleAuthProvider();
-      provider.addScope('email');
-      provider.addScope('profile');
-
-      console.log('Auth object:', auth);
-      console.log('Provider:', provider);
-
-      // Use redirect for both web and mobile (Expo web has popup limitations)
-      await signInWithRedirect(auth, provider);
-      console.log('signInWithRedirect completed');
-    } catch (error) {
-      console.error('Google sign-in error:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      Alert.alert('Error', `Failed to sign in with Google: ${error.message}`);
-    } finally {
+      
+      if (Platform.OS === 'web') {
+        // Web: Use Firebase's native popup authentication
+        const provider = new GoogleAuthProvider();
+        provider.addScope('email');
+        provider.addScope('profile');
+        
+        await signInWithPopup(auth, provider);
+        console.log('Google sign-in successful (web)');
+        // Auth state listener will handle the rest
+      } else {
+        // Native: Use expo-auth-session
+        const result = await promptAsync();
+        
+        // If user cancels or there's an error, reset loading
+        if (result.type !== 'success') {
+          setLoading(false);
+        }
+      }
+    } catch (error: any) {
+      console.error('Google sign-in initiation error:', error);
+      
+      let errorMessage = 'Failed to sign in with Google';
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'Sign-in was cancelled';
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        errorMessage = 'Another sign-in popup is already open';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
       setLoading(false);
     }
   };
@@ -73,7 +157,7 @@ export default function AuthScreen() {
         <TouchableOpacity
           style={[styles.button, styles.googleButton]}
           onPress={signInWithGoogle}
-          disabled={loading}
+          disabled={loading || (Platform.OS !== 'web' && !request)}
         >
           <Text style={styles.buttonText}>Sign in with Google</Text>
         </TouchableOpacity>

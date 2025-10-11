@@ -23,9 +23,9 @@ import { N8NService } from '../services/n8nService';
 
 // Types
 import { GitHubRepo, RepoData, UserAnalysis } from '../types';
-import { RootStackParamList } from '../App';
+import { HomeStackParamList } from '../navigation/MainTabs';
 
-type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
+type HomeScreenNavigationProp = StackNavigationProp<HomeStackParamList, 'HomeMain'>;
 
 export default function HomeScreen() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -34,14 +34,22 @@ export default function HomeScreen() {
   const [filteredRepos, setFilteredRepos] = useState<GitHubRepo[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [importUrl, setImportUrl] = useState('');
   const [showImportInput, setShowImportInput] = useState(false);
+  const [latestAnalysis, setLatestAnalysis] = useState<UserAnalysis | null>(null);
 
   const navigation = useNavigation<HomeScreenNavigationProp>();
 
   useEffect(() => {
-    loadUserData();
+    const unsubscribe = loadUserData();
+    return () => {
+      // Cleanup auth listener on unmount
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -54,18 +62,32 @@ export default function HomeScreen() {
     filterRepos();
   }, [searchQuery, repos]);
 
-  const loadUserData = async () => {
+  const loadUserData = () => {
     try {
-      const currentUser = FirebaseService.onAuthStateChange((firebaseUser) => {
+      const unsubscribe = FirebaseService.onAuthStateChange((firebaseUser) => {
         if (firebaseUser) {
           setUser(firebaseUser);
           FirebaseService.getUser(firebaseUser.uid).then(userDoc => {
             setUserData(userDoc);
           });
+          // Load latest analysis
+          loadLatestAnalysis(firebaseUser.uid);
         }
       });
+      return unsubscribe;
     } catch (error) {
       console.error('Error loading user data:', error);
+    }
+  };
+
+  const loadLatestAnalysis = async (uid: string) => {
+    try {
+      const analyses = await FirebaseService.getUserAnalyses(uid, 1);
+      if (analyses.length > 0) {
+        setLatestAnalysis(analyses[0]);
+      }
+    } catch (error) {
+      console.error('[HomeScreen] Error loading latest analysis:', error);
     }
   };
 
@@ -144,6 +166,7 @@ export default function HomeScreen() {
       }
 
       setLoading(true);
+      setLoadingMessage('Preparing repository data...');
 
       const repoData: RepoData = {
         repo_owner: repo.owner.login,
@@ -152,23 +175,71 @@ export default function HomeScreen() {
       };
 
       // Call n8n webhook for analysis
+      setLoadingMessage('Analyzing repository (this may take 20-30 seconds)...');
+      console.log('[HomeScreen] Starting analysis...');
       const analysisResult = await N8NService.analyzeRepository(repoData);
+      console.log('[HomeScreen] Analysis completed');
+      
+      setLoadingMessage('Processing results...');
       const parsedAnalysis = N8NService.parseAnalysisResult(analysisResult);
+      console.log('[HomeScreen] Parsed', parsedAnalysis.issues.length, 'issues');
 
       // Save analysis to database
-      await FirebaseService.saveAnalysis(user.uid, repoData, parsedAnalysis);
+      setLoadingMessage('Saving results...');
+      console.log('[HomeScreen] Saving to Firebase...');
+      const analysisId = await FirebaseService.saveAnalysis(user.uid, repoData, parsedAnalysis);
+      console.log('[HomeScreen] Saved with ID:', analysisId);
+      
       await FirebaseService.incrementUserAttempts(user.uid);
+      console.log('[HomeScreen] Incremented attempts');
 
-      // Navigate to results screen
-      navigation.navigate('Main' as never);
+      // Create the analysis object to display
+      const newAnalysis: UserAnalysis = {
+        id: analysisId,
+        userId: user.uid,
+        repoData,
+        analysisResult: parsedAnalysis,
+        createdAt: new Date(),
+        attempts: 1,
+      };
+      
+      // Update latest analysis to show on homepage
+      setLatestAnalysis(newAnalysis);
 
-      Alert.alert('Success', 'Repository analysis completed!');
+      setLoading(false);
+      setLoadingMessage('');
+      
+      console.log('[HomeScreen] Showing success message');
+      
+      // Show success - use web-compatible alert
+      if (Platform.OS === 'web') {
+        // On web, use a simple alert and navigate
+        const viewDetails = window.confirm(
+          `Success! Found ${parsedAnalysis.issues.length} issues. View detailed analysis?`
+        );
+        if (viewDetails) {
+          navigation.navigate('AnalysisDetail', { analysis: newAnalysis });
+        }
+      } else {
+        // On native, use Alert.alert
+        Alert.alert(
+          'Success!', 
+          `Found ${parsedAnalysis.issues.length} issues. View detailed analysis?`,
+          [
+            {
+              text: 'View Details',
+              onPress: () => navigation.navigate('AnalysisDetail', { analysis: newAnalysis })
+            },
+            { text: 'OK', style: 'cancel' }
+          ]
+        );
+      }
 
     } catch (error) {
-      console.error('Error analyzing repo:', error);
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to analyze repository');
-    } finally {
+      console.error('[HomeScreen] Error analyzing repo:', error);
       setLoading(false);
+      setLoadingMessage('');
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to analyze repository');
     }
   };
 
@@ -249,6 +320,35 @@ export default function HomeScreen() {
         )}
       </View>
 
+      {latestAnalysis && (
+        <View style={styles.latestAnalysisContainer}>
+          <View style={styles.latestAnalysisHeader}>
+            <Text style={styles.latestAnalysisTitle}>Latest Analysis</Text>
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('AnalysisDetail', { analysis: latestAnalysis })}
+            >
+              <Text style={styles.viewDetailsLink}>View Details →</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity 
+            style={styles.latestAnalysisCard}
+            onPress={() => navigation.navigate('AnalysisDetail', { analysis: latestAnalysis })}
+          >
+            <View style={styles.latestAnalysisInfo}>
+              <Text style={styles.latestRepoName}>{latestAnalysis.repoData.repo_name}</Text>
+              <Text style={styles.latestRepoOwner}>by {latestAnalysis.repoData.repo_owner}</Text>
+              <Text style={styles.latestDate}>
+                {new Date(latestAnalysis.createdAt).toLocaleDateString()}
+              </Text>
+            </View>
+            <View style={styles.latestIssuesCount}>
+              <Text style={styles.issuesCountNumber}>{latestAnalysis.analysisResult.issues.length}</Text>
+              <Text style={styles.issuesCountLabel}>Issues Found</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.controls}>
         <TouchableOpacity
           style={styles.importButton}
@@ -289,11 +389,13 @@ export default function HomeScreen() {
       </View>
 
       {loading && !refreshing ? (
-        <View style={styles.loadingContainer}>
+        <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading repositories...</Text>
+          <Text style={styles.loadingText}>{loadingMessage || 'Loading...'}</Text>
         </View>
-      ) : (
+      ) : null}
+      
+      {!loading && (
         <FlatList
           data={filteredRepos}
           renderItem={renderRepoItem}
@@ -343,6 +445,78 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '600',
+  },
+  latestAnalysisContainer: {
+    padding: 20,
+    paddingTop: 10,
+  },
+  latestAnalysisHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  latestAnalysisTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+  },
+  viewDetailsLink: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  latestAnalysisCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: '#007AFF',
+  },
+  latestAnalysisInfo: {
+    flex: 1,
+  },
+  latestRepoName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 4,
+  },
+  latestRepoOwner: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  latestDate: {
+    fontSize: 12,
+    color: '#999',
+  },
+  latestIssuesCount: {
+    alignItems: 'center',
+    backgroundColor: '#f0f4ff',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    minWidth: 80,
+  },
+  issuesCountNumber: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#ff6b6b',
+    marginBottom: 4,
+  },
+  issuesCountLabel: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
   },
   controls: {
     padding: 20,
@@ -404,10 +578,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#666',
+    color: '#fff',
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   listContainer: {
     flex: 1,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { TouchableOpacity, Text } from 'react-native';
 
@@ -7,6 +8,18 @@ import { TouchableOpacity, Text } from 'react-native';
 import HomeScreen from '../screens/HomeScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import AnalysisDetailScreen from '../screens/AnalysisDetailScreen';
+import { UserAnalysis } from '../types';
+
+export type HomeStackParamList = {
+  HomeMain: undefined;
+  AnalysisDetail: { analysis: UserAnalysis };
+};
+
+export type HistoryStackParamList = {
+  HistoryMain: undefined;
+  AnalysisDetail: { analysis: UserAnalysis };
+};
 
 export type MainTabParamList = {
   Home: undefined;
@@ -15,6 +28,26 @@ export type MainTabParamList = {
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
+const HomeStack = createStackNavigator<HomeStackParamList>();
+const HistoryStack = createStackNavigator<HistoryStackParamList>();
+
+function HomeStackScreen() {
+  return (
+    <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+      <HomeStack.Screen name="HomeMain" component={HomeScreen} />
+      <HomeStack.Screen name="AnalysisDetail" component={AnalysisDetailScreen} />
+    </HomeStack.Navigator>
+  );
+}
+
+function HistoryStackScreen() {
+  return (
+    <HistoryStack.Navigator screenOptions={{ headerShown: false }}>
+      <HistoryStack.Screen name="HistoryMain" component={HistoryScreen} />
+      <HistoryStack.Screen name="AnalysisDetail" component={AnalysisDetailScreen} />
+    </HistoryStack.Navigator>
+  );
+}
 
 export default function MainTabs() {
   return (
@@ -51,14 +84,14 @@ export default function MainTabs() {
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
+        component={HomeStackScreen}
         options={{
           title: 'Analyze',
         }}
       />
       <Tab.Screen
         name="History"
-        component={HistoryScreen}
+        component={HistoryStackScreen}
         options={{
           title: 'History',
         }}
