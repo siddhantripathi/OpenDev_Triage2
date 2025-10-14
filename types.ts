@@ -10,14 +10,19 @@ export interface AnalysisIssue {
 }
 
 export interface AnalysisResult {
-  content: {
-    parts: Array<{
-      text: string;
-    }>;
-    role?: string;
-  };
-  finishReason: string;
-  index: number;
+  candidates: Array<{
+    content: {
+      parts: Array<{
+        text: string;
+      }>;
+      role?: string;
+    };
+    finishReason: string;
+    index: number;
+  }>;
+  usageMetadata?: any;
+  modelVersion?: string;
+  responseId?: string;
 }
 
 export interface UserAnalysis {

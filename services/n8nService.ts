@@ -23,9 +23,22 @@ export class N8NService {
         timeout: 90000, // 90 seconds timeout for long analysis
       });
 
-      return response.data as AnalysisResult;
-    } catch (error) {
+      // Validate response structure
+      if (!response.data) {
+        throw new Error('Empty response from analysis service');
+      }
 
+      if (!Array.isArray(response.data) || response.data.length === 0) {
+        throw new Error('Invalid response format - expected non-empty array');
+      }
+
+      const firstResult = response.data[0];
+      if (!firstResult.candidates || !Array.isArray(firstResult.candidates) || firstResult.candidates.length === 0) {
+        throw new Error('Invalid response structure - missing candidates array');
+      }
+
+      return response.data[0] as AnalysisResult;
+    } catch (error) {
       if (axios.isAxiosError(error)) {
         if (error.code === 'ECONNABORTED') {
           throw new Error('Analysis timeout (>90s). Repository might be too large.');
@@ -39,12 +52,12 @@ export class N8NService {
         if (error.response?.status === 429) {
           throw new Error('Rate limit exceeded - please try again later');
         }
-        if (error.response?.status >= 500) {
+        if (error.response && error.response.status >= 500) {
           throw new Error('n8n server error - please try again later');
         }
       }
 
-      throw new Error('Failed to analyze repository');
+      throw new Error(`Failed to analyze repository: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -52,22 +65,38 @@ export class N8NService {
     try {
       // The response is an array with one object
       const firstResult = Array.isArray(analysisResult) ? analysisResult[0] : analysisResult;
-      const text = firstResult?.content?.parts?.[0]?.text;
+      
+      // Handle the candidates array wrapper
+      const candidate = firstResult?.candidates?.[0];
+      if (!candidate) {
+        throw new Error('No candidates found in analysis response');
+      }
+      
+      const text = candidate?.content?.parts?.[0]?.text;
 
       if (!text) {
-        throw new Error('Invalid analysis response format');
+        throw new Error('No text content found in analysis response');
       }
 
-      const parsed = JSON.parse(text);
+      // Strip markdown code block formatting
+      let cleanText = text;
+      if (cleanText.startsWith('```json\n')) {
+        cleanText = cleanText.substring(8); // Remove '```json\n'
+      }
+      if (cleanText.endsWith('\n```')) {
+        cleanText = cleanText.substring(0, cleanText.length - 5); // Remove '\n```'
+      }
+
+      const parsed = JSON.parse(cleanText);
 
       if (!parsed || !Array.isArray(parsed) || parsed.length === 0) {
-        throw new Error('Invalid analysis data format');
+        throw new Error('Invalid analysis data format - expected array with analysis object');
       }
 
       const analysis = parsed[0];
 
       if (!analysis.issues || !Array.isArray(analysis.issues) || !analysis.prompt) {
-        throw new Error('Analysis response missing required fields');
+        throw new Error('Analysis response missing required fields: issues array and prompt string');
       }
 
       return {
@@ -75,7 +104,10 @@ export class N8NService {
         prompt: analysis.prompt,
       };
     } catch (error) {
-      throw new Error('Failed to parse analysis results');
+      if (error instanceof SyntaxError) {
+        throw new Error('Failed to parse JSON from analysis response - invalid JSON format');
+      }
+      throw new Error(`Failed to parse analysis results: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }
