@@ -56,7 +56,7 @@ export default function HistoryScreen() {
       });
       return unsubscribe;
     } catch (error) {
-      console.error('Error loading user data:', error);
+      // Silent error handling
     }
   };
 
@@ -66,10 +66,8 @@ export default function HistoryScreen() {
     try {
       setLoading(true);
       const userAnalyses = await FirebaseService.getUserAnalyses(user.uid, 50);
-      console.log('[HistoryScreen] Loaded', userAnalyses.length, 'analyses');
       setAnalyses(userAnalyses);
     } catch (error: any) {
-      console.error('Error loading analyses:', error);
       
       // Check if it's the index error
       if (error?.message?.includes('index') || error?.code === 'failed-precondition') {

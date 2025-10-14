@@ -63,15 +63,12 @@ export default function AuthScreen() {
   const handleGoogleSignIn = async (idToken: string) => {
     try {
       setLoading(true);
-      console.log('Signing in with Google ID token...');
 
       // Sign in with Firebase using the ID token
       await FirebaseService.signInWithGoogle(idToken);
       
-      console.log('Google sign-in successful');
       // Don't set loading to false here - the auth state listener will handle it
     } catch (error: any) {
-      console.error('Google sign-in error:', error);
       
       let errorMessage = 'Failed to sign in with Google';
       if (error.code === 'auth/popup-closed-by-user') {
@@ -90,7 +87,6 @@ export default function AuthScreen() {
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
-      console.log('Starting Google sign-in...');
       
       if (Platform.OS === 'web') {
         // Web: Use Firebase's native popup authentication
@@ -99,7 +95,6 @@ export default function AuthScreen() {
         provider.addScope('profile');
         
         await signInWithPopup(auth, provider);
-        console.log('Google sign-in successful (web)');
         // Auth state listener will handle the rest
       } else {
         // Native: Use expo-auth-session
@@ -111,7 +106,6 @@ export default function AuthScreen() {
         }
       }
     } catch (error: any) {
-      console.error('Google sign-in initiation error:', error);
       
       let errorMessage = 'Failed to sign in with Google';
       if (error.code === 'auth/popup-closed-by-user') {

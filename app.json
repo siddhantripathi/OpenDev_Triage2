@@ -16,7 +16,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.opendevtriage.app",
-      "associatedDomains": ["applinks:your-domain.com"]
+      "associatedDomains": [
+        "applinks:your-domain.com",
+        "applinks:your-domain.com"
+      ],
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,6 +33,7 @@
       "package": "com.opendevtriage.app",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
@@ -35,7 +43,10 @@
               "scheme": "opendev-triage"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -52,6 +63,11 @@
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d6c3a69a-e25f-4de2-bbd5-1f7860392ffd"
+      }
+    }
   }
 }

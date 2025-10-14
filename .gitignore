@@ -8,11 +8,18 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
-opendev-triage-firebase-adminsdk-fbsvc-4bba3e1c3f.json
+
+# Environment variables
 .env
+.env.local
+.env.*.local
+
+# Firebase & Google credentials (NEVER commit these!)
+*firebase*adminsdk*.json
 GoogleService-Info.plist
-client_secret_479698031277-v23ag4c9p7r5fuctnksc9u1usstjcd3t.apps.googleusercontent.com.json
 google-services.json
+client_secret*.json
+service-account*.json
 
 # Native
 .kotlin/

@@ -18,7 +18,6 @@ export class GitHubService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching GitHub repos:', error);
       throw new Error('Failed to fetch repositories');
     }
   }
@@ -41,7 +40,6 @@ export class GitHubService {
       );
       return Array.isArray(response.data) ? response.data : [response.data];
     } catch (error) {
-      console.error('Error fetching repo contents:', error);
       throw new Error('Failed to fetch repository contents');
     }
   }
@@ -90,7 +88,6 @@ export class GitHubService {
       });
       return response.data.items;
     } catch (error) {
-      console.error('Error searching repositories:', error);
       throw new Error('Failed to search repositories');
     }
   }
@@ -115,7 +112,6 @@ export class GitHubService {
       );
       return response.data;
     } catch (error) {
-      console.error('Error fetching branches:', error);
       throw new Error('Failed to fetch branches');
     }
   }

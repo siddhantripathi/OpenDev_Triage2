@@ -45,6 +45,7 @@ export default function HomeScreen() {
   const [branches, setBranches] = useState<Array<{ name: string }>>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>('main');
   const [loadingBranches, setLoadingBranches] = useState(false);
+  const [showLimitReached, setShowLimitReached] = useState(false);
 
   const navigation = useNavigation<HomeScreenNavigationProp>();
 
@@ -88,7 +89,7 @@ export default function HomeScreen() {
       });
       return unsubscribe;
     } catch (error) {
-      console.error('Error loading user data:', error);
+      // Silent error handling
     }
   };
 
@@ -99,7 +100,7 @@ export default function HomeScreen() {
         setLatestAnalysis(analyses[0]);
       }
     } catch (error) {
-      console.error('[HomeScreen] Error loading latest analysis:', error);
+      // Silent error handling
     }
   };
 
@@ -119,7 +120,6 @@ export default function HomeScreen() {
       const defaultBranch = GitHubService.getDefaultBranch(repoBranches);
       setSelectedBranch(defaultBranch);
     } catch (error) {
-      console.error('Error loading branches:', error);
       setBranches([]);
       setSelectedBranch('main');
     } finally {
@@ -135,7 +135,6 @@ export default function HomeScreen() {
       const userRepos = await GitHubService.getUserRepos(userData.githubToken);
       setRepos(userRepos);
     } catch (error) {
-      console.error('Error loading repos:', error);
       Alert.alert('Error', 'Failed to load repositories');
     } finally {
       setLoading(false);
@@ -161,6 +160,7 @@ export default function HomeScreen() {
     }
 
     const parsed = GitHubService.parseRepoUrl(importUrl.trim());
+    
     if (!parsed) {
       Alert.alert('Error', 'Please enter a valid GitHub repository URL');
       return;
@@ -188,16 +188,17 @@ export default function HomeScreen() {
   };
 
   const handleAnalyzeRepo = async (repo: GitHubRepo) => {
-    if (!user) return;
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in to analyze repositories');
+      return;
+    }
 
     try {
       // Check if user can analyze more repos
       const canAnalyze = await FirebaseService.canUserAnalyze(user.uid);
+      
       if (!canAnalyze) {
-        Alert.alert(
-          'Limit Reached',
-          'You have reached the maximum of 5 analyses. Please contact support for more.'
-        );
+        setShowLimitReached(true);
         return;
       }
 
@@ -212,22 +213,16 @@ export default function HomeScreen() {
 
       // Call n8n webhook for analysis
       setLoadingMessage('Analyzing repository (this may take 20-30 seconds)...');
-      console.log('[HomeScreen] Starting analysis...');
       const analysisResult = await N8NService.analyzeRepository(repoData);
-      console.log('[HomeScreen] Analysis completed');
       
       setLoadingMessage('Processing results...');
       const parsedAnalysis = N8NService.parseAnalysisResult(analysisResult);
-      console.log('[HomeScreen] Parsed', parsedAnalysis.issues.length, 'issues');
 
       // Save analysis to database
       setLoadingMessage('Saving results...');
-      console.log('[HomeScreen] Saving to Firebase...');
       const analysisId = await FirebaseService.saveAnalysis(user.uid, repoData, parsedAnalysis);
-      console.log('[HomeScreen] Saved with ID:', analysisId);
       
       await FirebaseService.decrementUserAttempts(user.uid);
-      console.log('[HomeScreen] Incremented attempts');
 
       // Create the analysis object to display
       const newAnalysis: UserAnalysis = {
@@ -244,8 +239,6 @@ export default function HomeScreen() {
 
       setLoading(false);
       setLoadingMessage('');
-      
-      console.log('[HomeScreen] Showing success message');
       
       // Show success - use web-compatible alert
       if (Platform.OS === 'web') {
@@ -272,7 +265,6 @@ export default function HomeScreen() {
       }
 
     } catch (error) {
-      console.error('[HomeScreen] Error analyzing repo:', error);
       setLoading(false);
       setLoadingMessage('');
       Alert.alert('Error', error instanceof Error ? error.message : 'Failed to analyze repository');
@@ -287,6 +279,33 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Limit Reached Overlay */}
+      {showLimitReached && (
+        <TouchableOpacity 
+          style={styles.limitOverlay}
+          activeOpacity={1}
+          onPress={() => setShowLimitReached(false)}
+        >
+          <View style={styles.limitModal}>
+            <View style={styles.limitIconContainer}>
+              <Text style={styles.limitIcon}>🚫</Text>
+            </View>
+            <Text style={styles.limitTitle}>Analysis Limit Reached</Text>
+            <Text style={styles.limitMessage}>
+              You've used all 5 of your free analyses.{'\n\n'}
+              To continue analyzing repositories, please contact support or check back later.
+            </Text>
+            <TouchableOpacity 
+              style={styles.limitButton}
+              onPress={() => setShowLimitReached(false)}
+            >
+              <Text style={styles.limitButtonText}>Got it</Text>
+            </TouchableOpacity>
+            <Text style={styles.limitHint}>Tap anywhere to dismiss</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.header}>
         <Text style={styles.title}>Repository Analysis</Text>
         <Text style={styles.subtitle}>
@@ -696,5 +715,77 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  limitOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10000,
+    padding: 20,
+  },
+  limitModal: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 30,
+    maxWidth: 400,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+    // Web-compatible shadow
+    ...(Platform.OS === 'web' && {
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+    }),
+  },
+  limitIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#fff0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  limitIcon: {
+    fontSize: 48,
+  },
+  limitTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  limitMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 25,
+  },
+  limitButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  limitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  limitHint: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 5,
   },
 });

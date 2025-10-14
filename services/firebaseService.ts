@@ -34,9 +34,7 @@ export class FirebaseService {
   }
 
   static onAuthStateChange(callback: (user: FirebaseUser | null) => void) {
-    console.log('Setting up auth state change listener');
     return onAuthStateChanged(auth, (user) => {
-      console.log('Auth state changed:', user ? 'User logged in' : 'User logged out', user?.uid);
       callback(user);
     });
   }

@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,7 +47,7 @@ export default function ProfileScreen() {
       });
       return unsubscribe;
     } catch (error) {
-      console.error('Error loading user data:', error);
+      // Silent error handling
     }
   };
 
@@ -79,7 +80,6 @@ export default function ProfileScreen() {
       setUser(null);
       setUserData(null);
     } catch (error) {
-      console.error('Error signing out:', error);
       if (Platform.OS === 'web') {
         alert('Failed to sign out');
       } else {
@@ -108,7 +108,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.profileIcon}>
           <Text style={styles.profileInitial}>
@@ -191,7 +191,7 @@ export default function ProfileScreen() {
           Analyze repositories for issues and improvements
         </Text>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
