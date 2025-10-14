@@ -20,7 +20,7 @@ export class N8NService {
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 90000, // 90 seconds timeout for long analysis
+        timeout: 180000, // 3 minutes timeout for long analysis
       });
 
       // Validate response structure
@@ -33,6 +33,7 @@ export class N8NService {
       }
 
       const firstResult = response.data[0];
+      
       if (!firstResult.candidates || !Array.isArray(firstResult.candidates) || firstResult.candidates.length === 0) {
         throw new Error('Invalid response structure - missing candidates array');
       }
@@ -63,42 +64,44 @@ export class N8NService {
 
   static parseAnalysisResult(analysisResult: AnalysisResult): { issues: string[]; prompt: string } {
     try {
-      // The response is an array with one object
-      const firstResult = Array.isArray(analysisResult) ? analysisResult[0] : analysisResult;
-      
       // Handle the candidates array wrapper
-      const candidate = firstResult?.candidates?.[0];
+      const candidate = analysisResult?.candidates?.[0];
       if (!candidate) {
         throw new Error('No candidates found in analysis response');
       }
       
       const text = candidate?.content?.parts?.[0]?.text;
-
+  
       if (!text) {
         throw new Error('No text content found in analysis response');
       }
-
+  
       // Strip markdown code block formatting
       let cleanText = text;
       if (cleanText.startsWith('```json\n')) {
         cleanText = cleanText.substring(8); // Remove '```json\n'
       }
       if (cleanText.endsWith('\n```')) {
-        cleanText = cleanText.substring(0, cleanText.length - 5); // Remove '\n```'
+        cleanText = cleanText.substring(0, cleanText.length - 4); // Remove '\n```'
+      } else if (cleanText.endsWith('```')) {
+        cleanText = cleanText.substring(0, cleanText.length - 3); // Remove '```'
       }
-
+      
+      // Trim any extra whitespace
+      cleanText = cleanText.trim();
+  
       const parsed = JSON.parse(cleanText);
-
+  
       if (!parsed || !Array.isArray(parsed) || parsed.length === 0) {
         throw new Error('Invalid analysis data format - expected array with analysis object');
       }
-
+  
       const analysis = parsed[0];
-
+  
       if (!analysis.issues || !Array.isArray(analysis.issues) || !analysis.prompt) {
         throw new Error('Analysis response missing required fields: issues array and prompt string');
       }
-
+  
       return {
         issues: analysis.issues,
         prompt: analysis.prompt,
