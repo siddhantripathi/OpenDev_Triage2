@@ -20,6 +20,7 @@
     "expo": "~54.0.13",
     "expo-auth-session": "^7.0.8",
     "expo-build-properties": "^1.0.9",
+    "expo-clipboard": "^7.1.5",
     "expo-status-bar": "~3.0.8",
     "expo-web-browser": "^15.0.8",
     "firebase": "^10.14.1",

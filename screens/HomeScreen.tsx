@@ -17,11 +17,15 @@ import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { User as FirebaseUser } from 'firebase/auth';
+import { Ionicons } from '@expo/vector-icons';
 
 // Services
 import { FirebaseService } from '../services/firebaseService';
 import { GitHubService } from '../services/githubService';
 import { N8NService } from '../services/n8nService';
+
+// Components
+import { SuccessToast } from '../components/SuccessToast';
 
 // Types
 import { GitHubRepo, RepoData, UserAnalysis } from '../types';
@@ -46,6 +50,9 @@ export default function HomeScreen() {
   const [selectedBranch, setSelectedBranch] = useState<string>('main');
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [showLimitReached, setShowLimitReached] = useState(false);
+  const [hoveredButton, setHoveredButton] = useState<string | null>(null);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const navigation = useNavigation<HomeScreenNavigationProp>();
 
@@ -240,29 +247,14 @@ export default function HomeScreen() {
       setLoading(false);
       setLoadingMessage('');
       
-      // Show success - use web-compatible alert
-      if (Platform.OS === 'web') {
-        // On web, use a simple alert and navigate
-        const viewDetails = window.confirm(
-          `Success! Found ${parsedAnalysis.issues.length} issues. View detailed analysis?`
-        );
-        if (viewDetails) {
-          navigation.navigate('AnalysisDetail', { analysis: newAnalysis });
-        }
-      } else {
-        // On native, use Alert.alert
-        Alert.alert(
-          'Success!', 
-          `Found ${parsedAnalysis.issues.length} issues. View detailed analysis?`,
-          [
-            {
-              text: 'View Details',
-              onPress: () => navigation.navigate('AnalysisDetail', { analysis: newAnalysis })
-            },
-            { text: 'OK', style: 'cancel' }
-          ]
-        );
-      }
+      // Show success toast
+      setSuccessMessage(`Analysis complete! Found ${parsedAnalysis.issues.length} ${parsedAnalysis.issues.length === 1 ? 'issue' : 'issues'}`);
+      setShowSuccessToast(true);
+      
+      // Navigate to details after a brief delay
+      setTimeout(() => {
+        navigation.navigate('AnalysisDetail', { analysis: newAnalysis });
+      }, 1000);
 
     } catch (error) {
       setLoading(false);
@@ -279,6 +271,13 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Success Toast */}
+      <SuccessToast
+        visible={showSuccessToast}
+        message={successMessage}
+        onHide={() => setShowSuccessToast(false)}
+      />
+
       {/* Limit Reached Overlay */}
       {showLimitReached && (
         <TouchableOpacity 
@@ -350,9 +349,21 @@ export default function HomeScreen() {
 
       <View style={styles.controls}>
         <TouchableOpacity
-          style={styles.importButton}
+          style={[
+            styles.importButton,
+            Platform.OS === 'web' && hoveredButton === 'import' && styles.importButtonHover
+          ]}
           onPress={() => setShowImportInput(!showImportInput)}
+          {...(Platform.OS === 'web' ? {
+            onMouseEnter: () => setHoveredButton('import'),
+            onMouseLeave: () => setHoveredButton(null),
+          } : {})}
         >
+          <Ionicons 
+            name={showImportInput ? "close-circle-outline" : "cloud-download-outline"} 
+            size={20} 
+            color="#fff" 
+          />
           <Text style={styles.importButtonText}>
             {showImportInput ? 'Cancel Import' : 'Import from URL'}
           </Text>
@@ -369,9 +380,17 @@ export default function HomeScreen() {
               autoCorrect={false}
             />
             <TouchableOpacity
-              style={styles.importSubmitButton}
+              style={[
+                styles.importSubmitButton,
+                Platform.OS === 'web' && hoveredButton === 'submit' && styles.importSubmitButtonHover
+              ]}
               onPress={handleImportFromUrl}
+              {...(Platform.OS === 'web' ? {
+                onMouseEnter: () => setHoveredButton('submit'),
+                onMouseLeave: () => setHoveredButton(null),
+              } : {})}
             >
+              <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
               <Text style={styles.importSubmitText}>Import</Text>
             </TouchableOpacity>
           </View>
@@ -453,10 +472,19 @@ export default function HomeScreen() {
 
                 {selectedRepo && selectedBranch && (
                   <TouchableOpacity
-                    style={styles.analyzeButtonLarge}
+                    style={[
+                      styles.analyzeButtonLarge,
+                      Platform.OS === 'web' && hoveredButton === 'analyze' && styles.analyzeButtonHover,
+                      loading && styles.analyzeButtonDisabled
+                    ]}
                     onPress={() => handleAnalyzeRepo(selectedRepo)}
                     disabled={loading}
+                    {...(Platform.OS === 'web' && !loading ? {
+                      onMouseEnter: () => setHoveredButton('analyze'),
+                      onMouseLeave: () => setHoveredButton(null),
+                    } : {})}
                   >
+                    <Ionicons name="analytics-outline" size={20} color="#fff" />
                     <Text style={styles.analyzeButtonText}>
                       Analyze {selectedRepo.name} ({selectedBranch})
                     </Text>
@@ -465,9 +493,25 @@ export default function HomeScreen() {
               </>
             ) : (
               <View style={styles.emptyContainer}>
+                <Ionicons name="git-branch-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyTitle}>No Repositories Found</Text>
                 <Text style={styles.emptyText}>
-                  No repositories found. Connect your GitHub account or import from URL.
+                  Connect your GitHub account or import a repository from URL to get started.
                 </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.emptyActionButton,
+                    Platform.OS === 'web' && hoveredButton === 'emptyImport' && styles.emptyActionButtonHover
+                  ]}
+                  onPress={() => setShowImportInput(true)}
+                  {...(Platform.OS === 'web' ? {
+                    onMouseEnter: () => setHoveredButton('emptyImport'),
+                    onMouseLeave: () => setHoveredButton(null),
+                  } : {})}
+                >
+                  <Ionicons name="add-circle-outline" size={20} color="#007AFF" />
+                  <Text style={styles.emptyActionText}>Import Repository</Text>
+                </TouchableOpacity>
               </View>
             )}
           </>
@@ -580,12 +624,19 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   importButton: {
+    flexDirection: 'row',
     backgroundColor: '#28a745',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 15,
+    gap: 8,
+  },
+  importButtonHover: {
+    backgroundColor: '#218838',
+    transform: [{ scale: 1.02 }],
   },
   importButtonText: {
     color: '#fff',
@@ -607,11 +658,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   importSubmitButton: {
+    flexDirection: 'row',
     backgroundColor: '#007AFF',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
     justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  importSubmitButtonHover: {
+    backgroundColor: '#0056b3',
+    transform: [{ scale: 1.02 }],
   },
   importSubmitText: {
     color: '#fff',
@@ -664,11 +722,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 40,
   },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
+  },
   emptyText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
+    marginBottom: 24,
+    maxWidth: 300,
+  },
+  emptyActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  emptyActionButtonHover: {
+    backgroundColor: '#BBDEFB',
+  },
+  emptyActionText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
   },
   pickerScrollView: {
     flex: 1,
@@ -703,6 +787,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   analyzeButtonLarge: {
+    flexDirection: 'row',
     backgroundColor: '#007AFF',
     paddingVertical: 15,
     paddingHorizontal: 20,
@@ -710,6 +795,16 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 10,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  analyzeButtonHover: {
+    backgroundColor: '#0056b3',
+    transform: [{ scale: 1.02 }],
+  },
+  analyzeButtonDisabled: {
+    backgroundColor: '#99c2ff',
+    opacity: 0.6,
   },
   analyzeButtonText: {
     color: '#fff',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { UserAnalysis } from '../types';
+import { copyToClipboard } from '../utils/clipboard';
+import { getRelativeTime, formatDateTime } from '../utils/dateUtils';
 
 type AnalysisDetailRouteProp = RouteProp<
   { AnalysisDetail: { analysis: UserAnalysis } },
@@ -22,6 +24,7 @@ export default function AnalysisDetailScreen() {
   const route = useRoute<AnalysisDetailRouteProp>();
   const navigation = useNavigation<StackNavigationProp<any>>();
   const { analysis } = route.params;
+  const [hoveredButton, setHoveredButton] = useState<string | null>(null);
 
   const openGitHubRepo = () => {
     const url = `https://github.com/${analysis.repoData.repo_owner}/${analysis.repoData.repo_name}`;
@@ -30,6 +33,21 @@ export default function AnalysisDetailScreen() {
     } else {
       Linking.openURL(url);
     }
+  };
+
+  const copyIssue = async (issue: string, index: number) => {
+    await copyToClipboard(issue, `Issue #${index + 1} copied!`);
+  };
+
+  const copyAllIssues = async () => {
+    const allIssues = analysis.analysisResult.issues
+      .map((issue, index) => `Issue #${index + 1}:\n${issue}`)
+      .join('\n\n');
+    await copyToClipboard(allIssues, 'All issues copied!');
+  };
+
+  const copyPrompt = async () => {
+    await copyToClipboard(analysis.analysisResult.prompt, 'Suggested fixes copied!');
   };
 
   return (
@@ -74,14 +92,27 @@ export default function AnalysisDetailScreen() {
             <View style={styles.infoRow}>
               <Ionicons name="calendar" size={20} color="#666" />
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Analyzed On</Text>
+                <Text style={styles.infoLabel}>Analyzed</Text>
                 <Text style={styles.infoValue}>
-                  {new Date(analysis.createdAt).toLocaleString()}
+                  {getRelativeTime(new Date(analysis.createdAt))}
+                </Text>
+                <Text style={styles.infoSubtext}>
+                  {formatDateTime(new Date(analysis.createdAt))}
                 </Text>
               </View>
             </View>
 
-            <TouchableOpacity style={styles.githubButton} onPress={openGitHubRepo}>
+            <TouchableOpacity 
+              style={[
+                styles.githubButton,
+                Platform.OS === 'web' && hoveredButton === 'github' && styles.githubButtonHover
+              ]}
+              onPress={openGitHubRepo}
+              {...(Platform.OS === 'web' ? {
+                onMouseEnter: () => setHoveredButton('github'),
+                onMouseLeave: () => setHoveredButton(null),
+              } : {})}
+            >
               <Ionicons name="logo-github" size={20} color="#fff" />
               <Text style={styles.githubButtonText}>View on GitHub</Text>
             </TouchableOpacity>
@@ -90,9 +121,27 @@ export default function AnalysisDetailScreen() {
 
         {/* Issues Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Issues Found ({analysis.analysisResult.issues.length})
-          </Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              Issues Found ({analysis.analysisResult.issues.length})
+            </Text>
+            {analysis.analysisResult.issues.length > 0 && (
+              <TouchableOpacity 
+                style={[
+                  styles.copyAllButton,
+                  Platform.OS === 'web' && hoveredButton === 'copyAll' && styles.copyAllButtonHover
+                ]}
+                onPress={copyAllIssues}
+                {...(Platform.OS === 'web' ? {
+                  onMouseEnter: () => setHoveredButton('copyAll'),
+                  onMouseLeave: () => setHoveredButton(null),
+                } : {})}
+              >
+                <Ionicons name="copy-outline" size={16} color="#007AFF" />
+                <Text style={styles.copyAllText}>Copy All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <View style={styles.issuesCard}>
             {analysis.analysisResult.issues.length === 0 ? (
               <View style={styles.noIssues}>
@@ -103,8 +152,23 @@ export default function AnalysisDetailScreen() {
               analysis.analysisResult.issues.map((issue, index) => (
                 <View key={index} style={styles.issueItem}>
                   <View style={styles.issueHeader}>
-                    <Ionicons name="alert-circle" size={20} color="#ff6b6b" />
-                    <Text style={styles.issueNumber}>Issue #{index + 1}</Text>
+                    <View style={styles.issueHeaderLeft}>
+                      <Ionicons name="alert-circle" size={20} color="#ff6b6b" />
+                      <Text style={styles.issueNumber}>Issue #{index + 1}</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={[
+                        styles.copyButton,
+                        Platform.OS === 'web' && hoveredButton === `issue-${index}` && styles.copyButtonHover
+                      ]}
+                      onPress={() => copyIssue(issue, index)}
+                      {...(Platform.OS === 'web' ? {
+                        onMouseEnter: () => setHoveredButton(`issue-${index}`),
+                        onMouseLeave: () => setHoveredButton(null),
+                      } : {})}
+                    >
+                      <Ionicons name="copy-outline" size={16} color="#666" />
+                    </TouchableOpacity>
                   </View>
                   <Text style={styles.issueText}>{issue}</Text>
                 </View>
@@ -116,7 +180,23 @@ export default function AnalysisDetailScreen() {
         {/* Suggested Fixes Section */}
         {analysis.analysisResult.prompt && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Suggested Fixes</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Suggested Fixes</Text>
+              <TouchableOpacity 
+                style={[
+                  styles.copyPromptButton,
+                  Platform.OS === 'web' && hoveredButton === 'prompt' && styles.copyPromptButtonHover
+                ]}
+                onPress={copyPrompt}
+                {...(Platform.OS === 'web' ? {
+                  onMouseEnter: () => setHoveredButton('prompt'),
+                  onMouseLeave: () => setHoveredButton(null),
+                } : {})}
+              >
+                <Ionicons name="copy-outline" size={16} color="#FFA000" />
+                <Text style={styles.copyPromptText}>Copy</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.promptCard}>
               <Ionicons name="bulb" size={24} color="#FFA000" style={styles.promptIcon} />
               <Text style={styles.promptText}>{analysis.analysisResult.prompt}</Text>
@@ -197,6 +277,11 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '600',
   },
+  infoSubtext: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
   githubButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -210,6 +295,33 @@ const styles = StyleSheet.create({
   githubButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  githubButtonHover: {
+    backgroundColor: '#000',
+    transform: [{ scale: 1.02 }],
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  copyAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  copyAllButtonHover: {
+    backgroundColor: '#BBDEFB',
+  },
+  copyAllText: {
+    fontSize: 14,
+    color: '#007AFF',
     fontWeight: '600',
   },
   issuesCard: {
@@ -241,8 +353,21 @@ const styles = StyleSheet.create({
   issueHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 10,
+  },
+  issueHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
+  },
+  copyButton: {
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: '#f5f5f5',
+  },
+  copyButtonHover: {
+    backgroundColor: '#e0e0e0',
   },
   issueNumber: {
     fontSize: 14,
@@ -269,6 +394,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     lineHeight: 22,
+  },
+  copyPromptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
+  copyPromptButtonHover: {
+    backgroundColor: '#FFE082',
+  },
+  copyPromptText: {
+    fontSize: 14,
+    color: '#FFA000',
+    fontWeight: '600',
   },
 });
 
