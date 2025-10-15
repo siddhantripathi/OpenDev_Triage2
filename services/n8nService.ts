@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { RepoData, AnalysisResult } from '../types';
+import Constants from 'expo-constants';
 
 export class N8NService {
   private static getWebhookUrl(): string {
-    return process.env.EXPO_PUBLIC_N8N_WEBHOOK_URL || '';
+    return Constants.expoConfig?.extra?.n8nWebhookUrl || process.env.EXPO_PUBLIC_N8N_WEBHOOK_URL || '';
   }
 
   static async analyzeRepository(repoData: RepoData): Promise<AnalysisResult> {

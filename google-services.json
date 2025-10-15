@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "479698031277",
+    "project_id": "opendev-triage",
+    "storage_bucket": "opendev-triage.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:479698031277:android:2627d599f90d26b4392c24",
+        "android_client_info": {
+          "package_name": "com.opendevtriage.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "479698031277-gmcbt8bhrqbj1miqce3tdefgdomdfi9k.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.opendevtriage.app",
+            "certificate_hash": "60f9dc93ca034744f9f96e6f08ce750c0d6fcd41"
+          }
+        },
+        {
+          "client_id": "479698031277-03b3dd3tugbcognk0m47u8bvmtmmo4fa.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcP9WeAOIC7qX_kKipGHuEjXhfC3afLXc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "479698031277-03b3dd3tugbcognk0m47u8bvmtmmo4fa.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "479698031277-13fq27vkmu9omtfu4qnamplf8u2r3dd7.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.Sid.OpenDevTriage"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
