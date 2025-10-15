@@ -1,7 +1,9 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence, type Auth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 const firebaseConfig = {
   apiKey: Constants.expoConfig?.extra?.firebaseApiKey || process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -16,8 +18,13 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Auth - getAuth automatically handles platform differences
-const auth = getAuth(app);
+// Initialize Auth with AsyncStorage for React Native
+// Use getReactNativePersistence for native platforms, browser persistence for web
+const auth = initializeAuth(app, {
+  persistence: Platform.OS === 'web' 
+    ? undefined // Web uses default browser persistence
+    : getReactNativePersistence(AsyncStorage)
+});
 
 // Initialize Cloud Firestore
 const db = getFirestore(app);
