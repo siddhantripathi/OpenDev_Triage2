@@ -36,14 +36,6 @@ export default {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       googleServicesFile: "./google-services.json",
-      config: {
-        googleMaps: {
-          apiKey: null
-        }
-      },
-      manifestPlaceholders: {
-        appAuthRedirectScheme: "com.opendevtriage.app"
-      },
       intentFilters: [
         {
           action: "VIEW",
@@ -70,6 +62,11 @@ export default {
         {
           ios: {
             useFrameworks: "static"
+          },
+          android: {
+            manifestPlaceholders: {
+              appAuthRedirectScheme: "com.opendevtriage.app"
+            }
           }
         }
       ]
