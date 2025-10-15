@@ -40,8 +40,7 @@ Edit `.env` with your credentials:
 
 ```env
 # N8N Configuration
-EXPO_PUBLIC_N8N_WEBHOOK_URL=https://your-n8n-instance.app.n8n.cloud/webhook-test/OpenDev_Triage
-
+EXPO_PUBLIC_N8N_WEBHOOK_URL=https://your-n8n-instance.app.n8n.cloud
 # Firebase Configuration
 EXPO_PUBLIC_FIREBASE_API_KEY=your-key
 EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your-domain
