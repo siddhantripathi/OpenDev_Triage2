@@ -62,6 +62,11 @@ export default {
         {
           ios: {
             useFrameworks: "static"
+          },
+          android: {
+            manifestPlaceholders: {
+              appAuthRedirectScheme: "com.opendevtriage.app"
+            }
           }
         }
       ]
