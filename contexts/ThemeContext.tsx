@@ -59,10 +59,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const loadTheme = async () => {
     try {
+      console.log('[ThemeContext] Loading saved theme...');
       const saved = await AsyncStorage.getItem('theme');
+      console.log('[ThemeContext] Saved theme:', saved);
       if (saved) setThemeState(saved as Theme);
     } catch (error) {
-      console.error('Error loading theme:', error);
+      console.error('[ThemeContext] Error loading theme:', error);
     }
   };
 

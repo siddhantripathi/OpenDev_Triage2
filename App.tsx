@@ -29,20 +29,41 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Create or update user in Firestore
-        await FirebaseService.createOrUpdateUser(firebaseUser);
-        setUser(firebaseUser);
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
+    console.log('[App] Starting App useEffect...');
+    console.log('[App] Setting up auth state listener...');
+    
+    try {
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        console.log('[App] Auth state changed:', firebaseUser ? 'User logged in' : 'No user');
+        
+        if (firebaseUser) {
+          try {
+            console.log('[App] Creating/updating user in Firestore...');
+            // Create or update user in Firestore
+            await FirebaseService.createOrUpdateUser(firebaseUser);
+            console.log('[App] User created/updated successfully');
+            setUser(firebaseUser);
+          } catch (error) {
+            console.error('[App] Error creating/updating user:', error);
+            // Still set the user even if Firestore update fails
+            setUser(firebaseUser);
+          }
+        } else {
+          setUser(null);
+        }
+        setLoading(false);
+        console.log('[App] Loading complete');
+      });
 
-    return () => {
-      unsubscribe();
-    };
+      return () => {
+        console.log('[App] Cleaning up auth listener');
+        unsubscribe();
+      };
+    } catch (error) {
+      console.error('[App] Error setting up auth listener:', error);
+      setLoading(false);
+      throw error;
+    }
   }, []);
 
   if (loading) {
